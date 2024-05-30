@@ -1,0 +1,22 @@
+# $ micromamba create -f environment.yml
+# $ micromamba activate neb_example_env
+#
+
+name: neb_example_env
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - ase
+  - numpy
+  - scipy
+  - ipython
+  - pandas 
+  - black
+  - jupyter
+  - jupyterlab>3
+  - jupytext
+  - ipython
+  - pip:
+    # works for regular pip packages
+    - lammps-logfile
