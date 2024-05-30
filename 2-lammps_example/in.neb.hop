@@ -1,0 +1,106 @@
+# NEB simulation of 7 water molecules around 1 Fe(III)
+
+shell mkdir dump        # Folder for production dump files
+shell mkdir dump/forces
+shell mkdir restart         # Folder for restart files from production runs
+shell mkdir outRest     # Folder for several restart files
+shell mkdir outData      # Folder for output data files
+shell mkdir outDump   # Folder for the last config dump files 
+
+# Type of interpolation
+variable          interpol_type string idpp_interpolation # for IDPP interpolation
+# variable          interpol_type string lin_interpolation # for Linear interpolation
+
+# ------------------------------- Initialization Section --------------------
+
+# Define temperature and pressure parameters
+variable    press equal     1       # pressure (atm)
+variable    t equal   300       # Temperature (K)
+
+# Simulation setup
+units       real    
+atom_style  full
+boundary    p p p
+# ------------------------------- Atom Definition Section -------------------
+
+# Read in the initial state
+read_data       ${interpol_type}/image_0.data
+
+# ------------------------------- Settings Section --------------------------
+
+### a99SB-disp and 12-6 Zhang potential ###
+pair_style  lj/cut/tip4p/long 1 2 1 1 0.1546 10.0  
+
+bond_style      harmonic
+angle_style     harmonic
+kspace_style    pppm/tip4p 1e-6 # Default value from LAMMPS is 1e-4
+
+# Water a99SB-disp (4-site model)
+pair_coeff      2 2 0.00000 0.00000 # H-H
+pair_coeff      1 1 0.238764 3.165 # O-O
+pair_coeff      1 2 0.00000 0.00000 # O-H
+# 12-6 Zhang potential for ion-water interactions 
+# sigma and epsilon calculated using the Lorentz-Berthelot mixing rules 
+pair_coeff      1 3 22.6299927250629    1.88950369827116  # O-Fe3 GROUND 
+pair_coeff      2 3 0.00 0.00    # H-Fe ; this is basically zero 
+# ion-ion interaction 
+pair_coeff      3 3 2144.8651   0.614007396542322 # Fe3-Fe3 GROUND
+
+# Long-range dispersion corrections for energy and pressure
+pair_modify     tail yes 
+
+bond_coeff      1 10000.00 0.9572
+angle_coeff     1 10000.00 104.52
+
+# -------------------------------------------------------------------------------
+# create groups ###
+group hy        type 2
+group ox        type 1
+group ion     type 3
+group water     type 1 2
+
+# Masses
+mass            2 1.00794 # hy
+mass            1 15.9994  # ox
+mass            3 55.843 # fe3
+
+## set charges - beside manually ###
+set group ox charge    -1.18
+set group hy charge    0.59
+set group ion charge  3.0 # Fe3 GROUND
+
+# ------------------------------- Run Section -------------------------------
+
+# Compute force per atom
+compute forceAtom all property/atom fx fy fz
+
+variable	u uloop 64
+
+# The initial and final states have been relaxed
+# prior to this NEB calculation.
+
+timestep	0.001 # Previously 1 fs
+
+# All the atoms in the simulation are neb atoms
+group nebatoms type 1:3
+
+fix		1 nebatoms neb 2.30 # parallel ideal perp 0.5 spring constant = force(kcal/mol-A)/distance (A) or 0.1 eV/A
+
+thermo		1000
+thermo_modify flush yes
+
+dump            1 nebatoms custom 1000 dump/dump.neb.$u id mol type x y z 
+dump_modify    1 sort id
+dump            3 all custom 1000 dump/forces/force.$u id mol type x y z c_forceAtom[*]
+dump_modify 3 sort id 
+
+variable i equal part
+min_style   quickmin
+neb     0.0 1.153 1000000 1000000 1000 each ${interpol_type}/nebInput/image_$i verbose # fmax = 0.05 eV/A (1.153)
+
+# # Fix the end points of the NEB 
+# partition yes 0 63 fix endPnts all setforce 0.0 0.0 0.0 
+
+write_data 	outData/system-$u.data nocoeff
+write_restart outRest/restart-$u
+write_dump all custom outDump/dump-$u id mol type x y z ix iy iz modify sort id
