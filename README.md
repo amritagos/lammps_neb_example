@@ -24,3 +24,20 @@ LAMMPS has some support for linear interpolation. However, this might not constr
 ## Running LAMMPS
 
 This directory (`2-lammps_example`) includes an example for running LAMMPS on the Elja high-performance computing cluster, using the `nebInput` folder, and the two data files for the end points of the path. 
+
+## Post-Processing
+
+A very hacky to post-process the output log.lammps file from the simulation is provided in `3-postprocessing`. To get the final path, run the following: 
+
+```bash
+cd 3-postprocessing
+awk -f 'read_log_verbose.sh' log.lammps
+```
+
+This will produce `energy-step_1.dat` files for every step in the NEB, where 1 refers to the step number in the NEB. 
+
+To plot this, run:
+```bash
+python plot-linep-neb.py
+```
+This script would have to be edited with the correct filename. 
